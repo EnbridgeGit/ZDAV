@@ -1,0 +1,190 @@
+FUNCTION Z_AW_IDOC_IMPORT.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"       IMPORTING
+*"             VALUE(IDOCTYP) LIKE  EDISYN-DOCTYP
+*"             VALUE(LANG) LIKE  EDISEGT-LANGUA
+*"       TABLES
+*"              SEGMENTS STRUCTURE  LISTZEILE
+*"       EXCEPTIONS
+*"              IDOC_TYPE_DOESNOT_EXIST
+*"----------------------------------------------------------------------
+*-------------------------------------------------------------------
+* Given an IDOC type, this program will generate a structure
+* definition with flattened hierarchy. Specifically it will
+* return an array of the following information:
+* Attribute: Long_segment_name: E1CVBUK_E1CVBAK_...
+* Attribute: Short_segment_name: s1_s2_...
+* Attribute: Current segment description: SIS - partner
+* Attribute: Long_field_name: BSTYP
+* Attribute: Short_field_name: f1
+* Attribute: Current field description: Sales document
+*-------------------------------------------------------------------
+
+* Append control segment here
+INT_SEG-SEGNO = 0.
+INT_SEG-SEGNAME = 'CONTROL'.
+INT_SEG-SEG_DESCRIPTION = 'IDOC control record'.
+INT_SEG-EXT_SEGNAME = 'CONTROL'.
+INT_SEG-INT_SEGNAME = 's0'.
+INT_SEG-INT_FLDNAME = 'f1'.
+INT_SEG-EXT_FLDNAME = 'DOCNUM'.
+INT_SEG-FLD_DESCRIPTION = 'IDOC number'.
+INT_SEG-POSITION = 1.
+INT_SEG-KEYFLAG = 'X'.
+INT_SEG-INTTYPE = 'N'.
+INT_SEG-LENG = 16.
+INT_SEG-DECIMALS = 0.
+APPEND INT_SEG.
+
+INT_SEG-SEGNO = 0.
+INT_SEG-SEGNAME = 'CONTROL'.
+INT_SEG-SEG_DESCRIPTION = 'IDOC control record'.
+INT_SEG-EXT_SEGNAME = 'CONTROL'.
+INT_SEG-INT_SEGNAME = 's0'.
+INT_SEG-INT_FLDNAME = 'f2'.
+INT_SEG-EXT_FLDNAME = 'CREDAT'.
+INT_SEG-FLD_DESCRIPTION = 'Create date'.
+INT_SEG-POSITION = 2.
+INT_SEG-KEYFLAG = ' '.
+INT_SEG-INTTYPE = 'D'.
+INT_SEG-LENG = 8.
+INT_SEG-DECIMALS = 0.
+APPEND INT_SEG.
+
+INT_SEG-SEGNO = 0.
+INT_SEG-SEGNAME = 'CONTROL'.
+INT_SEG-SEG_DESCRIPTION = 'IDOC control record'.
+INT_SEG-EXT_SEGNAME = 'CONTROL'.
+INT_SEG-INT_SEGNAME = 's0'.
+INT_SEG-INT_FLDNAME = 'f3'.
+INT_SEG-EXT_FLDNAME = 'CRETIM'.
+INT_SEG-FLD_DESCRIPTION = 'Create time'.
+INT_SEG-POSITION = 3.
+INT_SEG-KEYFLAG = ' '.
+INT_SEG-INTTYPE = 'T'.
+INT_SEG-LENG = 6.
+INT_SEG-DECIMALS = 0.
+APPEND INT_SEG.
+
+INT_SEG-SEGNO = 0.
+INT_SEG-SEGNAME = 'CONTROL'.
+INT_SEG-SEG_DESCRIPTION = 'IDOC control record'.
+INT_SEG-EXT_SEGNAME = 'CONTROL'.
+INT_SEG-INT_SEGNAME = 's0'.
+INT_SEG-INT_FLDNAME = 'f4'.
+INT_SEG-EXT_FLDNAME = 'STATUS'.
+INT_SEG-FLD_DESCRIPTION = 'Status'.
+INT_SEG-POSITION = 4.
+INT_SEG-KEYFLAG = ' '.
+INT_SEG-INTTYPE = 'C'.
+INT_SEG-LENG = 2.
+INT_SEG-DECIMALS = 0.
+APPEND INT_SEG.
+
+INT_SEG-SEGNO = 0.
+INT_SEG-SEGNAME = 'CONTROL'.
+INT_SEG-SEG_DESCRIPTION = 'IDOC control record'.
+INT_SEG-EXT_SEGNAME = 'CONTROL'.
+INT_SEG-INT_SEGNAME = 's0'.
+INT_SEG-INT_FLDNAME = 'f5'.
+INT_SEG-EXT_FLDNAME = 'DIRECT'.
+INT_SEG-FLD_DESCRIPTION = 'IDOC direction: (IN, OUT)'.
+INT_SEG-POSITION = 5.
+INT_SEG-KEYFLAG = ' '.
+INT_SEG-INTTYPE = 'C'.
+INT_SEG-LENG = 1.
+INT_SEG-DECIMALS = 0.
+APPEND INT_SEG.
+
+SEGCNTI = 0.
+SELECT * FROM EDISYN WHERE DOCTYP = IDOCTYP.
+   SELECT SINGLE * FROM EDISEGT WHERE SEGTYP = EDISYN-SEGTYP
+                                AND   LANGUA = LANG.
+   INT_SEG-SEGNO = EDISYN-POSNO.
+   INT_SEG-SEGNAME = EDISYN-SEGTYP.
+   INT_SEG-SEG_DESCRIPTION = EDISEGT-DESCRP.
+   SEGCNTI = SEGCNTI + 1.
+   WRITE SEGCNTI TO SEGCNTS.
+
+*  PREPEND CONTROL segment to all segments as parent
+   MOVE-CORRESPONDING INT_SEG TO TMP_SEG.
+   CONCATENATE 'CONTROL-' EDISYN-SEGTYP INTO
+               TMP_SEG-EXT_SEGNAME.
+   CONCATENATE 'S0-S' SEGCNTS INTO TMP_SEG-INT_SEGNAME.
+   MOVE-CORRESPONDING TMP_SEG TO INT_SEG.
+
+   IF EDISYN-PARPNO NE 0.
+      MOVE-CORRESPONDING INT_SEG TO TMP_SEG.
+      READ TABLE INT_SEG WITH KEY SEGNO = EDISYN-PARPNO.
+      CONCATENATE INT_SEG-EXT_SEGNAME '-' EDISYN-SEGTYP INTO
+                  TMP_SEG-EXT_SEGNAME.
+      CONCATENATE INT_SEG-INT_SEGNAME '-s' SEGCNTS INTO
+                  TMP_SEG-INT_SEGNAME.
+      MOVE-CORRESPONDING TMP_SEG TO INT_SEG.
+   ENDIF.
+   FLDCNTI = 0.
+   CALL FUNCTION 'NAMETAB_GET'
+        EXPORTING
+             LANGU               = LANG
+*            ONLY                = ' '
+             TABNAME             = INT_SEG-SEGNAME
+        IMPORTING
+             HEADER              = NTAB_HDR
+             RC                  = RC
+        TABLES
+             NAMETAB             = NTAB
+        EXCEPTIONS
+             INTERNAL_ERROR      = 1
+             TABLE_HAS_NO_FIELDS = 2
+             TABLE_NOT_ACTIV     = 3
+             NO_TEXTS_FOUND      = 4
+             OTHERS              = 5.
+
+   LOOP AT NTAB.
+      FLDCNTI = FLDCNTI + 1.
+      WRITE FLDCNTI TO FLDCNTS.
+      CONDENSE FLDCNTS.
+      CONCATENATE 'f' FLDCNTS INTO INT_SEG-INT_FLDNAME.
+      INT_SEG-EXT_FLDNAME = NTAB-FIELDNAME.
+      INT_SEG-FLD_DESCRIPTION = NTAB-FIELDTEXT.
+      INT_SEG-POSITION = NTAB-POSITION.
+      INT_SEG-KEYFLAG = NTAB-KEYFLAG.
+      INT_SEG-INTTYPE = NTAB-INTTYPE.
+      INT_SEG-LENG = NTAB-DDLEN.
+      INT_SEG-DECIMALS = NTAB-DECIMALS.
+      APPEND INT_SEG.
+   ENDLOOP.
+ENDSELECT.
+
+SELECT SINGLE * FROM EDIDOT
+WHERE DOCTYP = IDOCTYP
+AND LANGUA = LANG.
+
+CONCATENATE EDIDOT-DESCRP '|' INTO SEGMENTS-ZEILE.
+APPEND SEGMENTS.
+
+LOOP AT INT_SEG.
+    CONCATENATE INT_SEG-EXT_SEGNAME '|'
+             INT_SEG-INT_SEGNAME '|'
+             INT_SEG-SEG_DESCRIPTION '|'
+             INT_SEG-EXT_FLDNAME '|'
+             INT_SEG-INT_FLDNAME '|'
+             INT_SEG-FLD_DESCRIPTION '|'
+             INT_SEG-POSITION '|'
+             INT_SEG-KEYFLAG '|'
+             INT_SEG-INTTYPE '|'
+             INT_SEG-LENG '|'
+             INT_SEG-DECIMALS '|'
+             INT_SEG-NOTNULL '|'
+             INTO SEGMENTS-ZEILE.
+    APPEND SEGMENTS.
+ENDLOOP.
+
+ENDFUNCTION.
+
+FORM Z_AW_IDOC_IMPORT_GETV CHANGING VERSION TYPE C.
+
+VERSION = '6.5.1.0'.
+
+ENDFORM.

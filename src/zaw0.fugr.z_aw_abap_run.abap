@@ -1,0 +1,58 @@
+FUNCTION Z_AW_ABAP_RUN.
+*"----------------------------------------------------------------------
+*"*"Local interface:
+*"       IMPORTING
+*"             VALUE(PROGRAMNAME) LIKE  SY-REPID
+*"       EXPORTING
+*"             VALUE(ERRORMESSAGE) LIKE  SY-MSGV1
+*"       TABLES
+*"              SELTAB STRUCTURE  RSPARAMS
+*"              LOG STRUCTURE  LISTZEILE
+*"       EXCEPTIONS
+*"              PROGRAM_DOES_NOT_EXIST
+*"----------------------------------------------------------------------
+
+DATA: BEGIN OF LISTOBJ OCCURS 0.
+       INCLUDE STRUCTURE ABAPLIST.
+DATA: END OF LISTOBJ.
+DATA: BEGIN OF PROGRAM OCCURS 0.
+       INCLUDE STRUCTURE PROGTAB.
+DATA: END OF PROGRAM.
+* if we need syntax check, do it here.
+DATA: MESS(72), LIN(72), WRD(72).
+
+   SELECT SINGLE * FROM D010SINF
+    WHERE PROG = PROGRAMNAME.
+   IF SY-SUBRC <> 0.
+      RAISE PROGRAM_DOES_NOT_EXIST.
+   ENDIF.
+
+   READ REPORT PROGRAMNAME INTO PROGRAM.
+   SYNTAX-CHECK FOR PROGRAM MESSAGE MESS LINE LIN WORD WRD.
+
+IF MESS <> SPACE.
+  ERRORMESSAGE = MESS.
+  EXIT.
+ENDIF.
+
+
+SUBMIT (PROGRAMNAME) WITH SELECTION-TABLE SELTAB
+          AND RETURN EXPORTING LIST TO MEMORY.
+
+CALL FUNCTION 'LIST_FROM_MEMORY'
+                            TABLES LISTOBJECT = LISTOBJ
+                            EXCEPTIONS NOT_FOUND = 1.
+IF SY-SUBRC = 0.
+
+  CALL FUNCTION 'LIST_TO_ASCI'
+                            TABLES LISTOBJECT = LISTOBJ
+                                   LISTASCI   = LOG.
+ENDIF.
+
+ENDFUNCTION.
+
+FORM Z_AW_ABAP_RUN_GETV CHANGING VERSION TYPE C.
+
+VERSION = '6.5.1.0'.
+
+ENDFORM.
